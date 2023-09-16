@@ -1,0 +1,21 @@
+
+POST http://127.0.0.1:8000/api/v1/user/login
+Content-Type: application/json
+
+
+{
+    "email": "ashot@mail.com",
+    "password": "1234"
+}
+
+#### Сигнал на обновление прайса
+POST http://127.0.0.1:8000/api/v1/partner/update
+Content-Type: application/json
+Authorization: Token db7106206ba8b0d179ebd83e9ef426d749e57662
+
+
+# {
+#     "token": "db7106206ba8b0d179ebd83e9ef426d749e57662"
+# }
+
+####
