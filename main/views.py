@@ -9,8 +9,6 @@ from django.core.validators import URLValidator
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
 
-from main.serializer import UserSerializer
-
 
 class LoginAccount(APIView):
     """
@@ -38,7 +36,6 @@ class PartnerUpdate(APIView):
     """
     Класс для обновления прайса от поставщика
     """
-    serializer_class = UserSerializer
     
     def post(self, request, *args, **kwargs):
         if request.user.is_authenticated:
@@ -75,7 +72,4 @@ class PartnerUpdate(APIView):
                                                 value=value)
         return JsonResponse({'Status': True})
     
-    def perform_create(self, serializer):
-
-        serializer.save(user=self.request.user)
 
