@@ -186,9 +186,9 @@ class Parametr(models.Model):
 
 class ProductParametr(models.Model):
 
-    product_info = models.ForeignKey(ProductInfo, related_name='product_infos', verbose_name='Информация о продуктах',
+    product_info = models.ForeignKey(ProductInfo, related_name='product_parametrs', verbose_name='Информация о продуктах',
                                      blank=True, on_delete=models.CASCADE)
-    parametr = models.ForeignKey(Parametr, on_delete=models.CASCADE, blank=True, related_name='product_infos',
+    parametr = models.ForeignKey(Parametr, on_delete=models.CASCADE, blank=True, related_name='product_parametrs',
                                  verbose_name='Параметр')
     value = models.CharField(max_length=100, verbose_name='Значение')
 

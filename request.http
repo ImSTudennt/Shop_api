@@ -1,11 +1,11 @@
-
+##### Авторизация
 POST http://127.0.0.1:8000/api/v1/user/login
 Content-Type: application/json
 
 
 {
-    "email": "ashot@mail.com",
-    "password": "1234"
+    "email": "vladimir_mosunov@mail.ru",
+    "password": "12345"
 }
 
 #### Сигнал на обновление прайса
@@ -13,9 +13,135 @@ POST http://127.0.0.1:8000/api/v1/partner/update
 Content-Type: application/json
 Authorization: Token db7106206ba8b0d179ebd83e9ef426d749e57662
 
+#### регистрация покупателя
 
-# {
-#     "token": "db7106206ba8b0d179ebd83e9ef426d749e57662"
-# }
+POST http://127.0.0.1:8000/api/v1/user/register
+Content-Type: application/json
 
-####
+{
+    "first_name": "Alisia",
+    "last_name": "Sebas",
+    "email": "vladimir_mosunov@mail.ru",
+    "password": "12345",
+    "company": "ООО_Лидер",
+    "position": "Менеджер"   
+}
+
+
+##### Подтверждение почтового адреса
+POST http://127.0.0.1:8000/api/v1/user/register/confirm
+Content-Type: application/json
+
+{
+    "email": "vladimir_mosunov@mail.ru",
+    "token": "2b715bb2e62a86e127"  
+}
+
+##### Список категорий
+GET http://127.0.0.1:8000/api/v1/categories
+Content-Type: application/json
+
+##### Список магазинов
+GET http://127.0.0.1:8000/api/v1/shops
+Content-Type: application/json
+
+##### Список магазинов
+GET http://127.0.0.1:8000/api/v1/products
+Content-Type: application/json
+
+{
+    "shop_id": "1",
+    "category_id": "224"  
+}
+
+##### Создание корзины
+POST http://127.0.0.1:8000/api/v1/basket
+Content-Type: application/json
+Authorization: Token db7106206ba8b0d179ebd83e9ef426d749e57662
+
+{
+   "items": [{ "product_info": 7,
+              "quantity": 2},
+              { "product_info": 8,
+              "quantity": 4}]
+}
+
+##### Удаление элементов корзины
+DELETE http://127.0.0.1:8000/api/v1/basket
+Content-Type: application/json
+Authorization: Token db7106206ba8b0d179ebd83e9ef426d749e57662
+
+{
+   "items": "10,11"
+}
+
+##### Просмотр элементов корзины
+GET http://127.0.0.1:8000/api/v1/basket
+Content-Type: application/json
+Authorization: Token db7106206ba8b0d179ebd83e9ef426d749e57662
+
+##### Добавление элементов в корзину
+PUT http://127.0.0.1:8000/api/v1/basket
+Content-Type: application/json
+Authorization: Token db7106206ba8b0d179ebd83e9ef426d749e57662
+
+{
+   "items": [{ "id": 13,
+              "quantity": 1},
+              { "id": 14,
+              "quantity": 1}]
+}
+
+
+##### Создание контакта пользователя
+POST http://127.0.0.1:8000/api/v1/contact
+Content-Type: application/json
+Authorization: Token db7106206ba8b0d179ebd83e9ef426d749e57662
+
+{
+    "city": "Moscow",
+    "street": "Sharipova",
+    "phone": "82478286666"
+}
+
+##### Удаление информации о контактных данных пользователя
+DELETE  http://127.0.0.1:8000/api/v1/contact
+Content-Type: application/json
+Authorization: Token db7106206ba8b0d179ebd83e9ef426d749e57662
+
+{
+   "items": "1"
+}
+
+##### Создание контакта пользователя
+PUT  http://127.0.0.1:8000/api/v1/contact
+Content-Type: application/json
+Authorization: Token db7106206ba8b0d179ebd83e9ef426d749e57662
+
+{
+    "id": "2",
+    "city": "Kazan",
+    "street": "Sharipova",
+    "phone": "82478286666",
+    "house": "My"
+}
+
+##### Получение контактов пользователя
+GET http://127.0.0.1:8000/api/v1/contact
+Content-Type: application/json
+Authorization: Token db7106206ba8b0d179ebd83e9ef426d749e57662
+
+##### Просмотр заказа
+GET http://127.0.0.1:8000/api/v1/order_confirm
+Content-Type: application/json
+Authorization: Token db7106206ba8b0d179ebd83e9ef426d749e57662
+
+##### Изменение статуса заказа
+POST http://127.0.0.1:8000/api/v1/order_confirm
+Content-Type: application/json
+Authorization: Token db7106206ba8b0d179ebd83e9ef426d749e57662
+
+{
+    "id": "1",
+    "contact": "2"  
+}
