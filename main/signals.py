@@ -8,12 +8,13 @@ new_order = Signal()
 change_order_state = Signal()
 
 STATE_CHOICES = {
-    'confirmed': 'Ваш заказ - Подтвержден',
-    'assembled': 'Ваш заказ - Собран',
-    'sent': 'Ваш заказ - Отправлен',
-    'delivered': 'Ваш заказ - Доставлен',
-    'canceled': 'Ваш заказ - Отменен',
+    "confirmed": "Ваш заказ - Подтвержден",
+    "assembled": "Ваш заказ - Собран",
+    "sent": "Ваш заказ - Отправлен",
+    "delivered": "Ваш заказ - Доставлен",
+    "canceled": "Ваш заказ - Отменен",
 }
+
 
 @receiver(new_user_registered)
 def new_user_registered_signal(user_id, **kwargs):
@@ -31,7 +32,7 @@ def new_user_registered_signal(user_id, **kwargs):
         # from:
         settings.EMAIL_HOST_USER,
         # to:
-        [token.user.email]
+        [token.user.email],
     )
     msg.send()
 
@@ -52,7 +53,7 @@ def new_order_signal(user_id, order_id, **kwargs):
         # from:
         settings.EMAIL_HOST_USER,
         # to:
-        [user.email]
+        [user.email],
     )
     msg.send()
 
@@ -73,6 +74,6 @@ def change_order_state_signal(user_id, state, **kwargs):
         # from:
         settings.EMAIL_HOST_USER,
         # to:
-        [user.email]
+        [user.email],
     )
     msg.send()
