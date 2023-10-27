@@ -12,7 +12,7 @@ goods:
     category: 224
     model: apple/iphone/xs-max
     name: Смартфон Apple iPhone XS Max 512GB (золотистый)
-    price: 110000
+    price: 120000
     price_rrc: 116990
     quantity: 14
     parameters:

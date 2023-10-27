@@ -1,17 +1,16 @@
-from django.forms import ValidationError
+from distutils.util import strtobool
 from django.http import JsonResponse
 from django.shortcuts import render
 from rest_framework.views import APIView
 from main.models import ConfirmEmailToken, Shop, Category, Product, ProductInfo, Parametr, ProductParametr, Order, OrderItem, Contact, User
 from yaml import load as load_yaml, Loader
 from requests import Response, get
-from django.core.validators import URLValidator
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.password_validation import validate_password
 from rest_framework.response import Response
 from main.serializer import CategorySerializer, ContactSerializer, OrderItemSerializer, OrderSerializer, ProductInfoSerializer, ShopSerializer, UserSerializer
-from main.signals import new_order_signal,  new_user_registered_signal
+from main.signals import change_order_state_signal, new_order_signal,  new_user_registered_signal
 from rest_framework.generics import ListAPIView
 from django.db.models import Q, Sum, F
 from django.db import IntegrityError
@@ -26,18 +25,15 @@ class RegisterUser(APIView):
 
         # проверяем обязательные аргументы
         if {"first_name", "last_name", "email", "password", "company", "position"}.issubset(request.data):
-            errors = {}
 
-            # проверяем пароль на сложность
-
+            # проверка пароля 
             try:
                 validate_password(request.data['password'])
             except Exception as password_error:
-                error_array = []
-                # noinspection PyTypeChecker
+                list_error = []
                 for item in password_error:
-                    error_array.append(item)
-                return JsonResponse({'Status': False, 'Errors': {'password': error_array}})
+                    list_error.append(item)
+                return JsonResponse({'Status': False, 'Errors': {'password': list_error}})
             else:
                 is_email_unique = len(User.objects.filter(email=request.data['email']))
                 if is_email_unique == 0:
@@ -53,29 +49,6 @@ class RegisterUser(APIView):
                         return JsonResponse({'Status': False, 'Errors': user_serializer.errors})
                 else:
                     return JsonResponse({'Status': False, 'Errors': 'Такой email уже существует'})
-
-        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
-
-
-class ConfirmAccount(APIView):
-    """
-    Класс для подтверждения почтового адреса
-    """
-    # Регистрация методом POST
-    def post(self, request, *args, **kwargs):
-
-        # проверяем обязательные аргументы
-        if {'email', 'token'}.issubset(request.data):
-
-            token = ConfirmEmailToken.objects.filter(user__email=request.data['email'],
-                                                     key=request.data['token']).first()
-            if token:
-                token.user.is_active = True
-                token.user.save()
-                token.delete()
-                return JsonResponse({'Status': True})
-            else:
-                return JsonResponse({'Status': False, 'errors': 'Неправильно указан токен или email'})
 
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
 
@@ -97,13 +70,36 @@ class LoginAccount(APIView):
 
             return JsonResponse({'Status': False, 'Errors': 'Не удалось авторизовать'})
 
-        return JsonResponse({'Status': False, 'Errors': 'Not enough all arguments'})
+        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
+    
 
+
+class ConfirmEmailAccount(APIView):
+    """
+    Класс для подтверждения почтового адреса
+    """
+    # Подтверждение методом POST
+    def post(self, request, *args, **kwargs):
+
+        # проверяем обязательные аргументы
+        if {'email', 'token'}.issubset(request.data):
+
+            token = ConfirmEmailToken.objects.filter(user__email=request.data['email'],
+                                                     key=request.data['token']).first()
+            if token:
+                token.user.is_active = True
+                token.user.save()
+                token.delete()
+                return JsonResponse({'Status': True})
+            else:
+                return JsonResponse({'Status': False, 'errors': 'Неправильно указан токен или email'})
+
+        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
 
 
 class PartnerUpdate(APIView):
     """
-    Класс для обновления прайса от поставщика
+    Класс для загрузки товара от поставщика. В данном случае для примера получаем yaml файл с товарами.
     """
     
     def post(self, request, *args, **kwargs):
@@ -114,33 +110,104 @@ class PartnerUpdate(APIView):
         if request.user.type != 'shop':
             return JsonResponse({'Status': False, 'Error': 'Только для магазинов'}, status=403)
 
-        # url = request.data.get('url')
         with open('data/shop1.yaml', encoding='utf-8') as f:
 
-            data = load_yaml(f, Loader=Loader)
-        # stream = get(url).content
-        # data = load_yaml(temp, Loader=Loader)
-        shop, _ = Shop.objects.get_or_create(name=data['shop'], user_id=request.user.id)
-        for category in data['categories']:
-            category_object, _ = Category.objects.get_or_create(id=category['id'], name=category['name'])
-            category_object.shops.add(shop.id)
-            category_object.save()
-        ProductInfo.objects.filter(shop_id=shop.id).delete()
-        for item in data['goods']:
-            product, _ = Product.objects.get_or_create(name=item['name'], category_id=item['category'])
-            product_info = ProductInfo.objects.create(product_id=product.id,
-                                                      external_id=item['id'],
-                                                      model_name=item['model'],
-                                                      price=item['price'],
-                                                      price_rrc=item['price_rrc'],
-                                                      quantity=item['quantity'],
-                                                      shop_id=shop.id)
-            for name, value in item['parameters'].items():
-                parametr_object, _ = Parametr.objects.get_or_create(name=name)
-                ProductParametr.objects.create(product_info_id=product_info.id,
-                                                parametr_id=parametr_object.id,
-                                                value=value)
+            data_dict = load_yaml(f, Loader=Loader)
+        
+        shop, _ = Shop.objects.get_or_create(name=data_dict['shop'], user_id=request.user.id)
+        for category in data_dict['categories']:
+            category_object, val = Category.objects.get_or_create(id=category['id'], name=category['name'])
+            if val:
+                category_object.shops.add(shop.id)
+                category_object.save()
+        for item in data_dict['goods']:
+            product, bool = Product.objects.get_or_create(name=item['name'], category_id=item['category'])
+            if bool:
+                product_info = ProductInfo.objects.create(product_id=product.id,
+                                                          external_id=item['id'],
+                                                          model_name=item['model'],
+                                                          price=item['price'],
+                                                          price_rrc=item['price_rrc'],
+                                                          quantity=item['quantity'],
+                                                          shop_id=shop.id)
+                for name, value in item['parameters'].items():
+                    parametr_object, _ = Parametr.objects.get_or_create(name=name)
+                    ProductParametr.objects.create(product_info_id=product_info.id,
+                                                    parametr_id=parametr_object.id,
+                                                    value=value)
         return JsonResponse({'Status': True})
+
+
+class AccountInfoView(APIView):
+    """
+    Класс для работы с информацией о пользователе
+    """
+
+    # получить данные
+    def get(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
+
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+
+    # Редактирование методом POST
+    def post(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
+        # проверяем обязательные аргументы
+
+        if 'password' in request.data:
+            # проверяем пароль на сложность
+            try:
+                validate_password(request.data['password'])
+            except Exception as password_error:
+                return JsonResponse({'Status': False, 'Errors': {'password': password_error}})
+            else:
+                request.user.set_password(request.data['password'])
+
+        serializer = UserSerializer(request.user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return JsonResponse({'Status': True})
+        else:
+            return JsonResponse({'Status': False, 'Errors': serializer.errors})
+    
+
+class PartnerState(APIView):
+    """
+    Класс для работы со статусом поставщика
+    """
+
+    # получить текущий статус
+    def get(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
+
+        if request.user.type != 'shop':
+            return JsonResponse({'Status': False, 'Error': 'Только для магазинов'}, status=403)
+
+        shop = request.user.shop
+        serializer = ShopSerializer(shop)
+        return Response(serializer.data)
+
+    # изменение текущего статуса
+    def post(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
+
+        if request.user.type != 'shop':
+            return JsonResponse({'Status': False, 'Error': 'Только для магазинов'}, status=403)
+        state = request.data.get('state')
+        if state:
+            try:
+                Shop.objects.filter(user_id=request.user.id).update(state=strtobool(state))
+                return JsonResponse({'Status': "Статус изменён"})
+            except ValueError as error:
+                return JsonResponse({'Status': False, 'Errors': str(error)})
+
+        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
+
     
 
 class CategoryView(ListAPIView):
@@ -267,7 +334,7 @@ class BasketView(APIView):
 
 class ContactView(APIView):
     """
-    Класс для работы с контактами покупателей
+    Класс для работы с контактами
     """
 
     # получить мои контакты
@@ -338,7 +405,7 @@ class ContactView(APIView):
 
 class OrderView(APIView):
     """
-    Класс для получения и размешения заказов пользователями
+    Класс для получения, размещения заказа, а также для изменения его статуса
     """
 
     # получить мои заказы
@@ -358,20 +425,46 @@ class OrderView(APIView):
     def post(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
+        
+        if request.user.type != 'buyer':
+            return JsonResponse({'Status': False, 'Error': 'Только для покупателей'}, status=403)
 
         if {'id', 'contact'}.issubset(request.data):
             if request.data['id'].isdigit():
                 try:
-                    is_updated = Order.objects.filter(
-                        user_id=request.user.id, id=request.data['id']).update(
-                        contact_id=request.data['contact'],
-                        state='new')
+                    ord = Order.objects.filter(user_id=request.user.id, id=request.data['id'])
+                    is_updated = ord.update(contact_id=request.data['contact'], state='new')
                 except IntegrityError as error:
                     print(error)
                     return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'})
                 else:
                     if is_updated:
-                        new_order_signal(sender=self.__class__, user_id=request.user.id)
+                        new_order_signal(sender=self.__class__, user_id=request.user.id, order_id=request.data['id'])
+                        return JsonResponse({'Status': True})
+
+        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
+    
+
+        # Изменение статуса заказа поставщиком 
+    def put(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
+        
+        if request.user.type != 'shop':
+            return JsonResponse({'Status': False, 'Error': 'Только для поставщиков'}, status=403)
+
+        if {'id', 'state'}.issubset(request.data):
+            if request.data['id'].isdigit():
+                try:
+                    ord = Order.objects.filter(id=request.data['id'])
+                    is_updated = ord.update(state=request.data['state'])
+                    id = Order.objects.get(id=request.data['id']).user_id
+                except IntegrityError as error:
+                    print(error)
+                    return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'})
+                else:
+                    if is_updated:
+                        change_order_state_signal(sender=self.__class__, user_id=id, state=request.data['state'])
                         return JsonResponse({'Status': True})
 
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
